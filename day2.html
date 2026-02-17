@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Users Table</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9;
+      padding: 40px;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+    }
+
+    .form-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    input {
+      padding: 8px;
+      font-size: 14px;
+      flex: 1;
+    }
+
+    button {
+      padding: 8px 12px;
+      background-color: #2c3e50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    button:hover {
+      background-color: #1a252f;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th,
+    td {
+      padding: 12px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #2c3e50;
+      color: white;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
+
+    tr:hover {
+      background-color: #e6f2ff;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <h2>Users List</h2>
+
+    <!-- Insert Form -->
+    <div class="form-group">
+      <input type="text" id="name" placeholder="Name">
+      <input type="email" id="email" placeholder="Email">
+      <input type="number" id="age" placeholder="Age">
+      <input type="text" id="gender" placeholder="Gender">
+      <input type="text" id="company" placeholder="Company">
+      <button onclick="addUser()">Add User</button>
+    </div>
+
+    <!-- Table -->
+    <table id="usersTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Age</th>
+          <th>Gender</th>
+          <th>Company</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+
+    let allUsers = [];
+
+    function loadUsers() {
+      fetch("http://localhost:5000/users")
+        .then(res => res.json())
+        .then(data => {
+          allUsers = data;
+          renderTable(allUsers);
+        })
+        .catch(err => console.error(err));
+    }
+
+    function renderTable(users) {
+      const tableBody = document.querySelector("#usersTable tbody");
+      tableBody.innerHTML = "";
+
+      users.forEach(user => {
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+        <td>${user.name}</td>
+        <td>${user.email}</td>
+        <td>${user.age}</td>
+        <td>${user.gender}</td>
+        <td>${user.company}</td>
+      `;
+
+        tableBody.appendChild(row);
+      });
+    }
+
+    function addUser() {
+
+      const name = document.getElementById("name").value;
+      const email = document.getElementById("email").value;
+      const age = document.getElementById("age").value;
+      const gender = document.getElementById("gender").value;
+      const company = document.getElementById("company").value;
+
+      if (!name || !email || !age || !gender || !company) {
+        alert("Please fill all fields");
+        return;
+      }
+      fetch("http://localhost:5000/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          age,
+          gender,
+          company
+        })
+      })
+        .then(res => {
+          if (!res.ok) {
+            return res.text().then(text => { throw new Error(text); });
+          }
+          return res.json();
+        })
+        .then(data => {
+          console.log("Inserted:", data);
+          loadUsers();
+          clearForm();
+        })
+        .catch(err => console.error("Error:", err));
+
+
+    }
+
+    function clearForm() {
+      document.getElementById("name").value = "";
+      document.getElementById("email").value = "";
+      document.getElementById("age").value = "";
+      document.getElementById("gender").value = "";
+      document.getElementById("company").value = "";
+    }
+
+    // Load users on page open
+    loadUsers();
+
+  </script>
+
+</body>
+
+</html>
