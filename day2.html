@@ -75,6 +75,22 @@
     tr:hover {
       background-color: #e6f2ff;
     }
+
+    .delete-btn {
+      background-color: #e74c3c;
+      border: none;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 16px;
+      transition: 0.3s ease;
+    }
+
+    .delete-btn:hover {
+      background-color: #c0392b;
+      transform: scale(1.1);
+    }
   </style>
 </head>
 
@@ -83,7 +99,6 @@
   <div class="container">
     <h2>Users List</h2>
 
-    <!-- Insert Form -->
     <div class="form-group">
       <input type="text" id="name" placeholder="Name">
       <input type="email" id="email" placeholder="Email">
@@ -93,7 +108,6 @@
       <button onclick="addUser()">Add User</button>
     </div>
 
-    <!-- Table -->
     <table id="usersTable">
       <thead>
         <tr>
@@ -102,47 +116,111 @@
           <th>Age</th>
           <th>Gender</th>
           <th>Company</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
+
+    <div id="pagination" style="text-align:center; margin-top:20px;"></div>
+
   </div>
 
-  <script>
 
+
+
+  <script>
     let allUsers = [];
+    let currentPage = 1;
+    const rowsPerPage = 4;
+    let editingUuid = null;
 
     function loadUsers() {
       fetch("http://localhost:5000/users")
         .then(res => res.json())
         .then(data => {
           allUsers = data;
-          renderTable(allUsers);
-        })
-        .catch(err => console.error(err));
+          displayPage(currentPage);
+          setupPagination();
+        });
     }
 
-    function renderTable(users) {
+    function displayPage(page) {
+      currentPage = page;
       const tableBody = document.querySelector("#usersTable tbody");
       tableBody.innerHTML = "";
+
+      const start = (page - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+      const users = allUsers.slice(start, end);
 
       users.forEach(user => {
         const row = document.createElement("tr");
 
-        row.innerHTML = `
-        <td>${user.name}</td>
-        <td>${user.email}</td>
-        <td>${user.age}</td>
-        <td>${user.gender}</td>
-        <td>${user.company}</td>
-      `;
+        if (editingUuid === user.uuid) {
+          row.innerHTML = `
+          <td><input id="edit-name" value="${user.name}"></td>
+          <td><input id="edit-email" value="${user.email}"></td>
+          <td><input id="edit-age" value="${user.age}"></td>
+          <td><input id="edit-gender" value="${user.gender}"></td>
+          <td><input id="edit-company" value="${user.company}"></td>
+          <td>
+            <button onclick="saveUser('${user.uuid}')">💾</button>
+          </td>
+        `;
+        } else {
+          row.innerHTML = `
+          <td>${user.name}</td>
+          <td>${user.email}</td>
+          <td>${user.age}</td>
+          <td>${user.gender}</td>
+          <td>${user.company}</td>
+          <td>
+            <button onclick="editUser('${user.uuid}')" style="margin-right:8px;">🖊️</button>
+            <button class="delete-btn" onclick="deleteUser('${user.uuid}')">🗑️</button>
+          </td>
+        `;
+        }
 
         tableBody.appendChild(row);
       });
     }
 
-    function addUser() {
+    function editUser(uuid) {
+      editingUuid = uuid;
+      displayPage(currentPage);
+    }
 
+    function saveUser(uuid) {
+      const name = document.getElementById("edit-name").value;
+      const email = document.getElementById("edit-email").value;
+      const age = document.getElementById("edit-age").value;
+      const gender = document.getElementById("edit-gender").value;
+      const company = document.getElementById("edit-company").value;
+
+      fetch(`http://localhost:5000/users/${uuid}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, age, gender, company })
+      })
+        .then(res => res.json())
+        .then(() => {
+          editingUuid = null;
+          loadUsers();
+        });
+    }
+
+    function deleteUser(uuid) {
+      if (!confirm("Are you sure?")) return;
+
+      fetch(`http://localhost:5000/users/${uuid}`, {
+        method: "DELETE"
+      })
+        .then(res => res.json())
+        .then(() => loadUsers());
+    }
+
+    function addUser() {
       const name = document.getElementById("name").value;
       const email = document.getElementById("email").value;
       const age = document.getElementById("age").value;
@@ -150,36 +228,20 @@
       const company = document.getElementById("company").value;
 
       if (!name || !email || !age || !gender || !company) {
-        alert("Please fill all fields");
+        alert("Fill all fields");
         return;
       }
+
       fetch("http://localhost:5000/users", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          name,
-          email,
-          age,
-          gender,
-          company
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, age, gender, company })
       })
-        .then(res => {
-          if (!res.ok) {
-            return res.text().then(text => { throw new Error(text); });
-          }
-          return res.json();
-        })
-        .then(data => {
-          console.log("Inserted:", data);
+        .then(res => res.json())
+        .then(() => {
           loadUsers();
           clearForm();
-        })
-        .catch(err => console.error("Error:", err));
-
-
+        });
     }
 
     function clearForm() {
@@ -190,10 +252,26 @@
       document.getElementById("company").value = "";
     }
 
-    // Load users on page open
-    loadUsers();
+    function setupPagination() {
+      const paginationDiv = document.getElementById("pagination");
+      paginationDiv.innerHTML = "";
+      const pageCount = Math.ceil(allUsers.length / rowsPerPage);
 
+      for (let i = 1; i <= pageCount; i++) {
+        const btn = document.createElement("button");
+        btn.innerText = i;
+        btn.style.margin = "5px";
+        btn.onclick = () => {
+          displayPage(i);
+          setupPagination();
+        };
+        paginationDiv.appendChild(btn);
+      }
+    }
+
+    loadUsers();
   </script>
+
 
 </body>
 
