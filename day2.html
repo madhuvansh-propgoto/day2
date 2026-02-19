@@ -17,7 +17,6 @@
     }
 
     .container {
-      max-width: 900px;
       margin: auto;
       background: white;
       padding: 20px;
@@ -91,6 +90,79 @@
       background-color: #c0392b;
       transform: scale(1.1);
     }
+
+    .pagination-btn {
+      margin: 5px;
+      padding: 6px 12px;
+      border: none;
+      cursor: pointer;
+      background-color: #ccc;
+      border-radius: 4px;
+      transition: 0.3s ease;
+    }
+
+    .pagination-btn:hover {
+      background-color: #999;
+      color: white;
+    }
+
+    .pagination-btn.active {
+      background-color: #2c3e50;
+      color: white;
+    }
+
+    .input-error {
+      border: 1px solid #e74c3c !important;
+    }
+
+    .error-text {
+      color: #e74c3c;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    #snackbar {
+      visibility: hidden;
+      min-width: 250px;
+      background-color: #e74c3c;
+      color: white;
+      text-align: center;
+      border-radius: 4px;
+      padding: 14px;
+      position: fixed;
+      z-index: 1;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+      font-size: 16px;
+    }
+
+    #snackbar.show {
+      visibility: visible;
+      animation: fadein 0.3s, fadeout 0.3s 2.7s;
+    }
+
+    @keyframes fadein {
+      from {
+        bottom: 0;
+        opacity: 0;
+      }
+
+      to {
+        bottom: 30px;
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeout {
+      from {
+        opacity: 1;
+      }
+
+      to {
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 
@@ -100,11 +172,26 @@
     <h2>Users List</h2>
 
     <div class="form-group">
-      <input type="text" id="name" placeholder="Name">
-      <input type="email" id="email" placeholder="Email">
-      <input type="number" id="age" placeholder="Age">
-      <input type="text" id="gender" placeholder="Gender">
-      <input type="text" id="company" placeholder="Company">
+      <div>
+        <input type="text" id="name" placeholder="Name">
+        <div class="error-text" id="name-error"></div>
+      </div>
+      <div>
+        <input type="email" id="email" placeholder="Email">
+        <div class="error-text" id="email-error"></div>
+      </div>
+      <div>
+        <input type="number" id="age" placeholder="Age">
+        <div class="error-text" id="age-error"></div>
+      </div>
+      <div>
+        <input type="text" id="gender" placeholder="Gender">
+        <div class="error-text" id="gender-error"></div>
+      </div>
+      <div>
+        <input type="text" id="company" placeholder="Company">
+        <div class="error-text" id="company-error"></div>
+      </div>
       <button onclick="addUser()">Add User</button>
     </div>
 
@@ -123,11 +210,9 @@
     </table>
 
     <div id="pagination" style="text-align:center; margin-top:20px;"></div>
+    <div id="snackbar"></div>
 
   </div>
-
-
-
 
   <script>
     let allUsers = [];
@@ -221,28 +306,64 @@
     }
 
     function addUser() {
-      const name = document.getElementById("name").value;
-      const email = document.getElementById("email").value;
-      const age = document.getElementById("age").value;
-      const gender = document.getElementById("gender").value;
-      const company = document.getElementById("company").value;
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const age = document.getElementById("age").value.trim();
+      const gender = document.getElementById("gender").value.trim();
+      const company = document.getElementById("company").value.trim();
 
-      if (!name || !email || !age || !gender || !company) {
-        alert("Fill all fields");
-        return;
+      let hasError = false;
+      clearErrors();
+
+      if (!name) {
+        showFieldError("name", "Name is required");
+        hasError = true;
       }
+
+      if (!email) {
+        showFieldError("email", "Email is required");
+        hasError = true;
+      }
+
+      if (!age) {
+        showFieldError("age", "Age is required");
+        hasError = true;
+      }
+
+      if (!gender) {
+        showFieldError("gender", "Gender is required");
+        hasError = true;
+      }
+
+      if (!company) {
+        showFieldError("company", "Company is required");
+        hasError = true;
+      }
+
+      if (hasError) return;
 
       fetch("http://localhost:5000/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, age, gender, company })
       })
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) {
+            if (res.status === 409) {
+              showSnackbar("Email already registered!");
+            }
+            throw new Error("Insert failed");
+          }
+          return res.json();
+        })
         .then(() => {
+          showSnackbar("User added successfully!", "success");
           loadUsers();
           clearForm();
-        });
+        })
+        .catch(err => console.error(err));
     }
+
 
     function clearForm() {
       document.getElementById("name").value = "";
@@ -255,23 +376,64 @@
     function setupPagination() {
       const paginationDiv = document.getElementById("pagination");
       paginationDiv.innerHTML = "";
+
       const pageCount = Math.ceil(allUsers.length / rowsPerPage);
 
       for (let i = 1; i <= pageCount; i++) {
         const btn = document.createElement("button");
         btn.innerText = i;
-        btn.style.margin = "5px";
+        btn.classList.add("pagination-btn");
+
+        if (i === currentPage) {
+          btn.classList.add("active");
+        }
+
         btn.onclick = () => {
+          currentPage = i;
           displayPage(i);
           setupPagination();
         };
+
         paginationDiv.appendChild(btn);
       }
     }
+    function showSnackbar(message, type = "error") {
+      const snackbar = document.getElementById("snackbar");
+
+      snackbar.innerText = message;
+
+      if (type === "success") {
+        snackbar.style.backgroundColor = "#27ae60";
+      } else {
+        snackbar.style.backgroundColor = "#e74c3c";
+      }
+
+      snackbar.className = "show";
+
+      setTimeout(() => {
+        snackbar.className = snackbar.className.replace("show", "");
+      }, 3000);
+    }
+    function showFieldError(fieldId, message) {
+      const input = document.getElementById(fieldId);
+      const errorDiv = document.getElementById(fieldId + "-error");
+
+      input.classList.add("input-error");
+      errorDiv.innerText = message;
+    }
+
+    function clearErrors() {
+      const inputs = ["name", "email", "age", "gender", "company"];
+
+      inputs.forEach(id => {
+        document.getElementById(id).classList.remove("input-error");
+        document.getElementById(id + "-error").innerText = "";
+      });
+    }
+
 
     loadUsers();
   </script>
-
 
 </body>
 

@@ -39,7 +39,16 @@ app.post("/users", async (req, res) => {
     );
 
     res.status(201).json(result.rows[0]);
+
   } catch (err) {
+
+    // UNIQUE constraint violation
+    if (err.code === "23505") {
+      return res.status(409).json({
+        error: "Email already exists"
+      });
+    }
+
     console.error(err);
     res.status(500).json({ error: "Insert failed" });
   }
